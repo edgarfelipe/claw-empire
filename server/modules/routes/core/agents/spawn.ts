@@ -3,6 +3,7 @@ import { notifyTaskStatus } from "../../../../gateway/client.ts";
 import type { RuntimeContext } from "../../../../types/runtime-context.ts";
 import { buildWorkflowPackExecutionGuidance } from "../../../workflow/packs/execution-guidance.ts";
 import { resolveVideoArtifactSpecForTask } from "../../../workflow/packs/video-artifact.ts";
+import { ensureVideoPreprodRemotionBestPracticesSkill } from "../../../workflow/core/video-skill-bootstrap.ts";
 
 export function registerAgentSpawnRoute(ctx: RuntimeContext): void {
   const {
@@ -144,6 +145,14 @@ export function registerAgentSpawnRoute(ctx: RuntimeContext): void {
     if (!task) {
       return res.status(400).json({ error: "task_not_found" });
     }
+    ensureVideoPreprodRemotionBestPracticesSkill({
+      db: db as any,
+      nowMs,
+      workflowPackKey: task.workflow_pack_key,
+      provider,
+      taskId,
+      appendTaskLog,
+    });
     const taskLang = resolveLang(task.description ?? task.title);
 
     const projectPath = task.project_path || process.cwd();

@@ -5,6 +5,7 @@ import type { AgentRow } from "../../shared/types.ts";
 import { resolveConstrainedAgentScopeForTask, selectAutoAssignableAgentForTask } from "./execution-run-auto-assign.ts";
 import { buildWorkflowPackExecutionGuidance } from "../../../workflow/packs/execution-guidance.ts";
 import { resolveVideoArtifactSpecForTask } from "../../../workflow/packs/video-artifact.ts";
+import { ensureVideoPreprodRemotionBestPracticesSkill } from "../../../workflow/core/video-skill-bootstrap.ts";
 import {
   buildInterruptPromptBlock,
   consumeInterruptPrompts,
@@ -282,6 +283,14 @@ export function registerTaskRunRoute(deps: TaskRunRouteDeps): void {
     if (!["claude", "codex", "gemini", "opencode", "copilot", "antigravity", "api"].includes(provider)) {
       return res.status(400).json({ error: "unsupported_provider", provider });
     }
+    ensureVideoPreprodRemotionBestPracticesSkill({
+      db: db as any,
+      nowMs,
+      workflowPackKey: task.workflow_pack_key,
+      provider,
+      taskId: id,
+      appendTaskLog,
+    });
     const executionSession = ensureTaskExecutionSession(id, agentId, provider);
     const pendingInterruptPrompts = loadPendingInterruptPrompts(db as any, id, executionSession.sessionId);
     const interruptPromptBlock = buildInterruptPromptBlock(pendingInterruptPrompts);
