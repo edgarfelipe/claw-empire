@@ -5,13 +5,11 @@ WORKDIR /app
 RUN corepack enable
 
 # Install CLI providers used by Claw-Empire agent runtime
-# NOTE: opencode package name is not currently resolvable from npm in this environment,
-# so install core CLIs first and keep opencode as best-effort.
 RUN npm install -g \
   @anthropic-ai/claude-code \
   @openai/codex \
   @google/gemini-cli \
-  && (npm install -g opencode || echo "[WARN] opencode npm package not found; skipped")
+  opencode-ai
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
