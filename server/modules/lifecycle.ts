@@ -166,6 +166,49 @@ export function startLifecycle(ctx: RuntimeContext): void {
   type InProgressRecoveryReason = "startup" | "interval";
   const ORPHAN_RECENT_ACTIVITY_WINDOW_MS = Math.max(120_000, IN_PROGRESS_ORPHAN_GRACE_MS);
 
+  function recoverOrphanWorkingAgents(reason: InProgressRecoveryReason): void {
+    const workingAgents = db
+      .prepare(
+        `
+    SELECT
+      a.id AS agent_id,
+      a.name AS agent_name,
+      a.current_task_id,
+      t.id AS task_id,
+      t.status AS task_status
+    FROM agents a
+    LEFT JOIN tasks t ON t.id = a.current_task_id
+    WHERE a.status = 'working'
+      AND a.current_task_id IS NOT NULL
+      AND TRIM(a.current_task_id) != ''
+    ORDER BY a.name ASC
+  `,
+      )
+      .all() as Array<{
+      agent_id: string;
+      agent_name: string | null;
+      current_task_id: string;
+      task_id: string | null;
+      task_status: string | null;
+    }>;
+
+    for (const row of workingAgents) {
+      const normalizedTaskStatus = String(row.task_status ?? "").trim().toLowerCase();
+      if (row.task_id && normalizedTaskStatus === "in_progress") continue;
+
+      const staleReason = row.task_id ? `task_status_${normalizedTaskStatus || "unknown"}` : "task_missing";
+      const cleared = db
+        .prepare("UPDATE agents SET status = 'idle', current_task_id = NULL WHERE id = ? AND current_task_id = ?")
+        .run(row.agent_id, row.current_task_id) as { changes?: number };
+      if ((cleared.changes ?? 0) === 0) continue;
+
+      broadcast("agent_status", db.prepare("SELECT * FROM agents WHERE id = ?").get(row.agent_id));
+      console.warn(
+        `[Claw-Empire] Recovery (${reason}): cleared stale working agent ${row.agent_id} (${row.agent_name || "unknown"}) -> ${row.current_task_id} (${staleReason})`,
+      );
+    }
+  }
+
   function recoverOrphanInProgressTasks(reason: InProgressRecoveryReason): void {
     const inProgressTasks = db
       .prepare(
@@ -312,6 +355,7 @@ export function startLifecycle(ctx: RuntimeContext): void {
     }
 
     recoverOrphanInProgressTasks("startup");
+    recoverOrphanWorkingAgents("startup");
 
     const reviewTasks = db
       .prepare(
@@ -409,6 +453,7 @@ export function startLifecycle(ctx: RuntimeContext): void {
   setInterval(rotateBreaks, 60_000);
   setTimeout(recoverInterruptedWorkflowOnStartup, 3_000);
   setInterval(() => recoverOrphanInProgressTasks("interval"), IN_PROGRESS_ORPHAN_SWEEP_MS);
+  setInterval(() => recoverOrphanWorkingAgents("interval"), IN_PROGRESS_ORPHAN_SWEEP_MS);
   setTimeout(sweepPendingSubtaskDelegations, 4_000);
   setInterval(sweepPendingSubtaskDelegations, SUBTASK_DELEGATION_SWEEP_MS);
   setTimeout(autoAssignAgentProviders, 4_000);
