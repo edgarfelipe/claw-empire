@@ -5,6 +5,7 @@ import type { DeviceCodeStart, OAuthConnectProvider, OAuthStatus } from "../api"
 import type { OAuthCallbackResult } from "../App";
 import { LANGUAGE_STORAGE_KEY, normalizeLanguage, useI18n } from "../i18n";
 import ApiSettingsTab from "./settings/ApiSettingsTab";
+import AuthManagementTab from "./settings/AuthManagementTab";
 import CliSettingsTab from "./settings/CliSettingsTab";
 import GatewaySettingsTab from "./settings/GatewaySettingsTab";
 import GeneralSettingsTab from "./settings/GeneralSettingsTab";
@@ -455,6 +456,8 @@ export default function SettingsPanel({
       {tab === "gateway" && (
         <GatewaySettingsTab t={t} form={form} setForm={setForm} persistSettings={persistSettings} />
       )}
+
+      {tab === "auth" && <AuthManagementTab t={t} />}
     </div>
   );
 }

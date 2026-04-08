@@ -362,6 +362,23 @@ CREATE INDEX IF NOT EXISTS idx_skill_learning_history_provider_status_updated
 CREATE INDEX IF NOT EXISTS idx_skill_learning_history_skill_lookup
   ON skill_learning_history(provider, repo, skill_id, updated_at DESC);
 
+CREATE TABLE IF NOT EXISTS message_attachments (
+  id TEXT PRIMARY KEY,
+  message_id TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  file_type TEXT NOT NULL CHECK(file_type IN ('image','audio','file')),
+  mime_type TEXT NOT NULL,
+  file_size INTEGER NOT NULL,
+  storage_path TEXT NOT NULL,
+  thumbnail_path TEXT,
+  duration_ms INTEGER,
+  width INTEGER,
+  height INTEGER,
+  created_at INTEGER DEFAULT (unixepoch()*1000)
+);
+
+CREATE INDEX IF NOT EXISTS idx_attachments_message ON message_attachments(message_id);
+
 CREATE TABLE IF NOT EXISTS api_providers (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -375,5 +392,41 @@ CREATE TABLE IF NOT EXISTS api_providers (
   created_at INTEGER DEFAULT (unixepoch()*1000),
   updated_at INTEGER DEFAULT (unixepoch()*1000)
 );
+
+CREATE TABLE IF NOT EXISTS provider_accounts (
+  id TEXT PRIMARY KEY,
+  provider TEXT NOT NULL,
+  label TEXT NOT NULL,
+  credentials_enc TEXT,
+  is_active INTEGER NOT NULL DEFAULT 0,
+  last_usage_pct REAL DEFAULT 0,
+  last_usage_check INTEGER,
+  status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','exhausted','disabled')),
+  created_at INTEGER DEFAULT (unixepoch()*1000)
+);
+
+CREATE TABLE IF NOT EXISTS usage_events (
+  id TEXT PRIMARY KEY,
+  provider TEXT NOT NULL,
+  account_id TEXT,
+  event_type TEXT NOT NULL,
+  usage_pct REAL,
+  details TEXT,
+  created_at INTEGER DEFAULT (unixepoch()*1000)
+);
+
+CREATE TABLE IF NOT EXISTS fallback_settings (
+  id TEXT PRIMARY KEY DEFAULT 'default',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  threshold_pct INTEGER NOT NULL DEFAULT 95,
+  warn_pct INTEGER NOT NULL DEFAULT 80,
+  telegram_alerts INTEGER NOT NULL DEFAULT 1,
+  auto_switch INTEGER NOT NULL DEFAULT 1,
+  fallback_chain TEXT NOT NULL DEFAULT '{"claude":["codex","ollama"],"codex":["claude","ollama"],"gemini":["ollama"]}',
+  updated_at INTEGER DEFAULT (unixepoch()*1000)
+);
+
+CREATE INDEX IF NOT EXISTS idx_provider_accounts_provider ON provider_accounts(provider, status);
+CREATE INDEX IF NOT EXISTS idx_usage_events_provider ON usage_events(provider, created_at DESC);
 `);
 }

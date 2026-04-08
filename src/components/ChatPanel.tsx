@@ -244,10 +244,21 @@ export function ChatPanel({
     [existingProjectError],
   );
 
+  const pendingAttachmentIdsRef = useRef<string[]>([]);
+
   const dispatchPending = useCallback(
     (action: PendingSendAction, projectMeta?: ProjectMetaPayload) => {
+      // Merge pending attachment IDs into projectMeta (use ref for immediate access)
+      const attIds = pendingAttachmentIdsRef.current;
+      const meta = attIds.length > 0
+        ? { ...projectMeta, attachment_ids: attIds }
+        : projectMeta;
+
+      // Clear pending attachments
+      pendingAttachmentIdsRef.current = [];
+
       if (action.kind === "directive") {
-        onSendDirective(action.content, projectMeta);
+        onSendDirective(action.content, meta);
         return;
       }
       if (action.kind === "announcement") {
@@ -255,18 +266,18 @@ export function ChatPanel({
         return;
       }
       if (action.kind === "task") {
-        onSendMessage(action.content, "agent", action.receiverId, "task_assign", projectMeta);
+        onSendMessage(action.content, "agent", action.receiverId, "task_assign", meta);
         return;
       }
       if (action.kind === "report") {
-        onSendMessage(action.content, "agent", action.receiverId, "report", projectMeta);
+        onSendMessage(action.content, "agent", action.receiverId, "report", meta);
         return;
       }
       if (action.kind === "chat") {
-        onSendMessage(action.content, "agent", action.receiverId, "chat", projectMeta);
+        onSendMessage(action.content, "agent", action.receiverId, "chat", meta);
         return;
       }
-      onSendMessage(action.content, "all", undefined, undefined, projectMeta);
+      onSendMessage(action.content, "all", undefined, undefined, meta);
     },
     [onSendAnnouncement, onSendDirective, onSendMessage],
   );
@@ -314,29 +325,35 @@ export function ChatPanel({
     setNewProjectGoal(action.kind === "directive" ? action.content : "");
   };
 
-  const handleSend = () => {
+  const handleSend = (attachmentIds?: string[]) => {
     const trimmed = input.trim();
-    if (!trimmed) return;
+    const hasAttachments = attachmentIds && attachmentIds.length > 0;
+    if (!trimmed && !hasAttachments) return;
+
+    // Store attachment IDs in ref for immediate access by dispatchPending
+    if (hasAttachments) {
+      pendingAttachmentIdsRef.current = attachmentIds;
+    }
 
     let action: PendingSendAction;
     if (trimmed.startsWith("$")) {
       const directiveContent = trimmed.slice(1).trim();
-      if (!directiveContent) return;
-      action = { kind: "directive", content: directiveContent };
+      if (!directiveContent && !hasAttachments) return;
+      action = { kind: "directive", content: directiveContent || "[attachment]" };
     } else if (mode === "announcement") {
-      action = { kind: "announcement", content: trimmed };
+      action = { kind: "announcement", content: trimmed || "[attachment]" };
     } else if (mode === "task" && selectedAgent) {
-      action = { kind: "task", content: trimmed, receiverId: selectedAgent.id };
+      action = { kind: "task", content: trimmed || "[attachment]", receiverId: selectedAgent.id };
     } else if (mode === "report" && selectedAgent) {
       action = {
         kind: "report",
-        content: `[${tr("보고 요청", "Report Request", "レポート依頼", "报告请求")}] ${trimmed}`,
+        content: `[${tr("보고 요청", "Report Request", "レポート依頼", "报告请求")}] ${trimmed || "[attachment]"}`,
         receiverId: selectedAgent.id,
       };
     } else if (selectedAgent) {
-      action = { kind: "chat", content: trimmed, receiverId: selectedAgent.id };
+      action = { kind: "chat", content: trimmed || "[attachment]", receiverId: selectedAgent.id };
     } else {
-      action = { kind: "broadcast", content: trimmed };
+      action = { kind: "broadcast", content: trimmed || "[attachment]" };
     }
 
     const requiresProject = action.kind === "directive" || action.kind === "task" || action.kind === "report";

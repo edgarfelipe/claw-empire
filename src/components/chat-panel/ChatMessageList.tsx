@@ -99,8 +99,21 @@ export default function ChatMessageList({
     streamingMessage && selectedAgent && streamingMessage.agent_id === selectedAgent.id,
   );
 
+  // Group consecutive messages from the same sender
+  const isGroupedWithPrev = (idx: number): boolean => {
+    if (idx === 0) return false;
+    const curr = visibleMessages[idx];
+    const prev = visibleMessages[idx - 1];
+    return (
+      curr.sender_type === prev.sender_type &&
+      curr.sender_id === prev.sender_id &&
+      curr.message_type === prev.message_type &&
+      curr.created_at - prev.created_at < 120000 // within 2 minutes
+    );
+  };
+
   return (
-    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+    <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-4 py-4" style={{ scrollBehavior: "smooth" }}>
       {visibleMessages.length === 0 ? (
         <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
           <div className="text-6xl">💬</div>
@@ -127,10 +140,11 @@ export default function ChatMessageList({
         </div>
       ) : (
         <>
-          {visibleMessages.map((msg) => {
+          {visibleMessages.map((msg, msgIdx) => {
             const isCeo = msg.sender_type === "ceo";
             const isDirective = msg.message_type === "directive";
             const isSystem = msg.sender_type === "system" || msg.message_type === "announcement" || isDirective;
+            const grouped = isGroupedWithPrev(msgIdx);
 
             const senderAgent =
               msg.sender_agent ?? agents.find((agent) => agent.id === msg.sender_id) ?? buildFallbackSenderAgent(msg);
@@ -144,12 +158,12 @@ export default function ChatMessageList({
 
             if (msg.sender_type === "agent" && msg.receiver_type === "all") {
               return (
-                <div key={msg.id} className="flex items-end gap-2">
-                  <AgentAvatar agent={senderAgent} spriteMap={spriteMap} size={28} />
-                  <div className="flex max-w-[75%] flex-col gap-1">
-                    <span className="px-1 text-xs text-gray-500">{senderName}</span>
-                    <div className="announcement-reply-bubble rounded-2xl rounded-bl-sm border border-yellow-500/20 bg-gray-700/70 px-4 py-2.5 text-sm text-gray-100 shadow-md">
-                      <MessageContent content={msg.content} />
+                <div key={msg.id} className={`flex items-end gap-2 ${grouped ? "mt-0.5" : "mt-3"}`}>
+                  {grouped ? <div className="w-7" /> : <AgentAvatar agent={senderAgent} spriteMap={spriteMap} size={28} />}
+                  <div className="flex max-w-[75%] flex-col gap-0.5">
+                    {!grouped && <span className="px-1 text-xs text-gray-500">{senderName}</span>}
+                    <div className="announcement-reply-bubble rounded-2xl rounded-bl-sm border border-yellow-500/20 bg-gray-700/70 px-4 py-2.5 text-sm text-gray-100 shadow-sm">
+                      <MessageContent content={msg.content} attachments={msg.attachments} />
                     </div>
                     {decisionRequest && (
                       <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-2 py-2">
@@ -184,7 +198,7 @@ export default function ChatMessageList({
                         </button>
                       </div>
                     )}
-                    <span className="px-1 text-xs text-gray-600">{formatTime(msg.created_at, locale)}</span>
+                    {!grouped && <span className="px-1 text-[10px] text-gray-600 opacity-0 transition-opacity group-hover:opacity-100">{formatTime(msg.created_at, locale)}</span>}
                   </div>
                 </div>
               );
@@ -205,7 +219,7 @@ export default function ChatMessageList({
                         : "announcement-message-bubble border border-yellow-500/30 bg-yellow-500/15 text-yellow-300"
                     }`}
                   >
-                    <MessageContent content={msg.content} />
+                    <MessageContent content={msg.content} attachments={msg.attachments} />
                   </div>
                   <span className="text-xs text-gray-600">{formatTime(msg.created_at, locale)}</span>
                 </div>
@@ -214,23 +228,23 @@ export default function ChatMessageList({
 
             if (isCeo) {
               return (
-                <div key={msg.id} className="flex flex-col items-end gap-1">
-                  <span className="px-1 text-xs text-gray-500">{tr("CEO", "CEO")}</span>
-                  <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-blue-600 px-4 py-2.5 text-sm text-white shadow-md">
-                    <MessageContent content={msg.content} />
+                <div key={msg.id} className={`group flex flex-col items-end ${grouped ? "mt-0.5" : "mt-3"}`}>
+                  {!grouped && <span className="px-1 text-xs text-gray-500">{tr("CEO", "CEO")}</span>}
+                  <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-gradient-to-br from-blue-600 to-blue-700 px-4 py-2.5 text-sm text-white shadow-sm">
+                    <MessageContent content={msg.content} attachments={msg.attachments} />
                   </div>
-                  <span className="px-1 text-xs text-gray-600">{formatTime(msg.created_at, locale)}</span>
+                  <span className="px-1 text-[10px] text-gray-600 opacity-0 transition-opacity group-hover:opacity-100">{formatTime(msg.created_at, locale)}</span>
                 </div>
               );
             }
 
             return (
-              <div key={msg.id} className="flex items-end gap-2">
-                <AgentAvatar agent={senderAgent} spriteMap={spriteMap} size={28} />
-                <div className="flex max-w-[75%] flex-col gap-1">
-                  <span className="px-1 text-xs text-gray-500">{senderName}</span>
-                  <div className="rounded-2xl rounded-bl-sm bg-gray-700 px-4 py-2.5 text-sm text-gray-100 shadow-md">
-                    <MessageContent content={msg.content} />
+              <div key={msg.id} className={`group flex items-end gap-2 ${grouped ? "mt-0.5" : "mt-3"}`}>
+                {grouped ? <div className="w-7" /> : <AgentAvatar agent={senderAgent} spriteMap={spriteMap} size={28} />}
+                <div className="flex max-w-[75%] flex-col gap-0.5">
+                  {!grouped && <span className="px-1 text-xs text-gray-500">{senderName}</span>}
+                  <div className="rounded-2xl rounded-bl-sm bg-gray-700 px-4 py-2.5 text-sm text-gray-100 shadow-sm">
+                    <MessageContent content={msg.content} attachments={msg.attachments} />
                   </div>
                   {decisionRequest && (
                     <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-2 py-2">
@@ -250,7 +264,7 @@ export default function ChatMessageList({
                               className="decision-inline-option w-full rounded-md px-2 py-1.5 text-left text-[11px] transition disabled:opacity-60"
                             >
                               {isBusy
-                                ? tr("전송 중...", "Sending...", "送信中...", "发送中...")
+                                ? tr("전송 중...", "Sending...", "送信中...", "发송中...")
                                 : `${option.number}. ${option.label}`}
                             </button>
                           );
@@ -265,7 +279,7 @@ export default function ChatMessageList({
                       </button>
                     </div>
                   )}
-                  <span className="px-1 text-xs text-gray-600">{formatTime(msg.created_at, locale)}</span>
+                  <span className="px-1 text-[10px] text-gray-600 opacity-0 transition-opacity group-hover:opacity-100">{formatTime(msg.created_at, locale)}</span>
                 </div>
               </div>
             );

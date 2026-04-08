@@ -1,7 +1,7 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
-export type UiLanguage = "ko" | "en" | "ja" | "zh";
+export type UiLanguage = "ko" | "en" | "ja" | "zh" | "pt";
 export const LANGUAGE_STORAGE_KEY = "climpire.language";
 export const LANGUAGE_USER_SET_STORAGE_KEY = "climpire.language.user_set";
 
@@ -10,6 +10,7 @@ export type LangText = {
   en: string;
   ja?: string;
   zh?: string;
+  pt?: string;
 };
 
 type TranslationInput = LangText | string;
@@ -20,6 +21,7 @@ function parseLanguage(value?: string | null): UiLanguage | null {
   if (code === "en" || code.startsWith("en-")) return "en";
   if (code === "ja" || code.startsWith("ja-")) return "ja";
   if (code === "zh" || code.startsWith("zh-")) return "zh";
+  if (code === "pt" || code.startsWith("pt-")) return "pt";
   return null;
 }
 
@@ -30,12 +32,13 @@ export function normalizeLanguage(value?: string | null): UiLanguage {
 /** 로캘별 이름 반환. 해당 로캘 이름이 비어있으면 영문(name) fallback */
 export function localeName(
   locale: UiLanguage | string,
-  obj: { name: string; name_ko?: string | null; name_ja?: string | null; name_zh?: string | null },
+  obj: { name: string; name_ko?: string | null; name_ja?: string | null; name_zh?: string | null; name_pt?: string | null },
 ): string {
   const lang = (typeof locale === "string" ? locale : "en").slice(0, 2);
   if (lang === "ko") return obj.name_ko || obj.name;
   if (lang === "ja") return obj.name_ja || obj.name;
   if (lang === "zh") return obj.name_zh || obj.name;
+  if (lang === "pt") return obj.name_pt || obj.name;
   return obj.name;
 }
 
@@ -73,6 +76,8 @@ export function localeFromLanguage(lang: UiLanguage): string {
       return "ja-JP";
     case "zh":
       return "zh-CN";
+    case "pt":
+      return "pt-BR";
     default:
       return "en-US";
   }
@@ -88,6 +93,8 @@ export function pickLang(lang: UiLanguage, text: LangText): string {
       return text.ja ?? text.en;
     case "zh":
       return text.zh ?? text.en;
+    case "pt":
+      return text.pt ?? text.en;
     default:
       return text.en;
   }

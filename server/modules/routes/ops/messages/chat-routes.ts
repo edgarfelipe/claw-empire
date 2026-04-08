@@ -1,6 +1,33 @@
 import type { SQLInputValue } from "node:sqlite";
+import { randomUUID } from "node:crypto";
+import { createReadStream, existsSync, mkdirSync, statSync } from "node:fs";
+import { join, extname } from "node:path";
+import multer from "multer";
 import type { RuntimeContext } from "../../../../types/runtime-context.ts";
 import type { AgentRow, StoredMessage } from "../../shared/types.ts";
+
+const UPLOADS_DIR = join(process.cwd(), "uploads");
+if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+  filename: (_req, file, cb) => {
+    const ext = extname(file.originalname);
+    cb(null, `${randomUUID()}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB
+});
+
+function classifyFileType(mime: string): "image" | "audio" | "file" {
+  if (mime.startsWith("image/")) return "image";
+  if (mime.startsWith("audio/")) return "audio";
+  return "file";
+}
+
 
 type ChatMessageRouteCtx = Pick<RuntimeContext, "app" | "db" | "broadcast">;
 
@@ -77,9 +104,35 @@ export function registerChatMessageRoutes(ctx: ChatMessageRouteCtx, deps: ChatMe
     LIMIT ?
   `,
       )
-      .all(...(params as SQLInputValue[]));
+      .all(...(params as SQLInputValue[])) as Array<Record<string, unknown>>;
 
-    res.json({ messages: messages.reverse() }); // return in chronological order
+    // Attach attachments to each message
+    const enriched = messages.map((msg) => {
+      const atts = db
+        .prepare(
+          `SELECT id, file_name, file_type, mime_type, file_size, thumbnail_path, duration_ms, width, height
+           FROM message_attachments WHERE message_id = ? ORDER BY created_at ASC`,
+        )
+        .all(msg.id as string) as Array<Record<string, unknown>>;
+
+      if (atts.length > 0) {
+        (msg as Record<string, unknown>).attachments = atts.map((a) => ({
+          id: a.id,
+          file_name: a.file_name,
+          file_type: a.file_type,
+          mime_type: a.mime_type,
+          file_size: a.file_size,
+          url: `/api/messages/files/${a.id}`,
+          thumbnail_url: a.thumbnail_path ? `/api/messages/files/${a.id}?thumb=1` : undefined,
+          duration_ms: a.duration_ms ?? undefined,
+          width: a.width ?? undefined,
+          height: a.height ?? undefined,
+        }));
+      }
+      return msg;
+    });
+
+    res.json({ messages: enriched.reverse() }); // return in chronological order
   });
 
   app.post("/api/messages", async (req, res) => {
@@ -161,7 +214,35 @@ export function registerChatMessageRoutes(ctx: ChatMessageRouteCtx, deps: ChatMe
       throw err;
     }
 
-    const msg = { ...storedMessage };
+    const msg = { ...storedMessage } as StoredMessage & { attachments?: unknown[] };
+
+    // Link attachments if provided
+    const attachmentIds = Array.isArray(body.attachment_ids) ? body.attachment_ids as string[] : [];
+    if (attachmentIds.length > 0 && storedMessage.id) {
+      for (const attId of attachmentIds) {
+        try {
+          db.exec(`UPDATE message_attachments SET message_id = '${storedMessage.id}' WHERE id = '${attId}'`);
+        } catch { /* ignore */ }
+      }
+      // Fetch attachments to include in response
+      try {
+        const atts = db.prepare(
+          `SELECT id, file_name, file_type, mime_type, file_size, storage_path, thumbnail_path, duration_ms, width, height FROM message_attachments WHERE message_id = ?`
+        ).all(storedMessage.id) as Array<Record<string, unknown>>;
+        msg.attachments = atts.map((a) => ({
+          id: a.id,
+          file_name: a.file_name,
+          file_type: a.file_type,
+          mime_type: a.mime_type,
+          file_size: a.file_size,
+          url: `/api/messages/files/${a.id}`,
+          thumbnail_url: a.thumbnail_path ? `/api/messages/files/${a.id}?thumb=1` : undefined,
+          duration_ms: a.duration_ms,
+          width: a.width,
+          height: a.height,
+        }));
+      } catch { /* ignore */ }
+    }
 
     if (!created) {
       if (
@@ -281,5 +362,137 @@ export function registerChatMessageRoutes(ctx: ChatMessageRouteCtx, deps: ChatMe
       .run();
     broadcast("messages_cleared", { scope: "announcements" });
     res.json({ ok: true, deleted: result.changes });
+  });
+
+  // File upload endpoint
+  app.post("/api/messages/upload", upload.array("files", 10), async (req, res) => {
+    try {
+      const files = req.files as Express.Multer.File[] | undefined;
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: "no_files" });
+      }
+
+      const attachments: Array<{
+        id: string;
+        file_name: string;
+        file_type: string;
+        mime_type: string;
+        file_size: number;
+        url: string;
+        thumbnail_url?: string;
+        width?: number;
+        height?: number;
+      }> = [];
+
+      for (const file of files) {
+        const id = randomUUID();
+        const fileType = classifyFileType(file.mimetype);
+        let width: number | undefined;
+        let height: number | undefined;
+        let thumbnailPath: string | undefined;
+
+        // Try to get image dimensions and generate thumbnail with sharp
+        if (fileType === "image") {
+          try {
+            const sharp = (await import("sharp")).default;
+            const metadata = await sharp(file.path).metadata();
+            width = metadata.width;
+            height = metadata.height;
+
+            // Generate thumbnail (max 300px wide)
+            const thumbName = `thumb_${file.filename}`;
+            thumbnailPath = join(UPLOADS_DIR, thumbName);
+            await sharp(file.path)
+              .resize(300, 300, { fit: "inside", withoutEnlargement: true })
+              .jpeg({ quality: 80 })
+              .toFile(thumbnailPath);
+          } catch {
+            // sharp might not be available or image might be corrupt - proceed without thumbnail
+          }
+        }
+
+        db.prepare(
+          `INSERT INTO message_attachments (id, message_id, file_name, file_type, mime_type, file_size, storage_path, thumbnail_path, width, height)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          id,
+          "", // message_id will be updated when message is sent
+          file.originalname,
+          fileType,
+          file.mimetype,
+          file.size,
+          file.path,
+          thumbnailPath ?? null,
+          width ?? null,
+          height ?? null,
+        );
+
+        attachments.push({
+          id,
+          file_name: file.originalname,
+          file_type: fileType,
+          mime_type: file.mimetype,
+          file_size: file.size,
+          url: `/api/messages/files/${id}`,
+          thumbnail_url: thumbnailPath ? `/api/messages/files/${id}?thumb=1` : undefined,
+          width,
+          height,
+        });
+      }
+
+      res.json({ ok: true, attachments });
+    } catch (err) {
+      console.error("Upload error:", err);
+      res.status(500).json({ error: "upload_failed" });
+    }
+  });
+
+  // Link attachments to a message
+  app.post("/api/messages/attachments/link", (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const messageId = typeof body.message_id === "string" ? body.message_id : null;
+    const attachmentIds = Array.isArray(body.attachment_ids) ? body.attachment_ids : [];
+
+    if (!messageId || attachmentIds.length === 0) {
+      return res.status(400).json({ error: "message_id_and_attachment_ids_required" });
+    }
+
+    for (const aid of attachmentIds) {
+      if (typeof aid === "string") {
+        db.prepare("UPDATE message_attachments SET message_id = ? WHERE id = ?").run(messageId, aid);
+      }
+    }
+
+    res.json({ ok: true });
+  });
+
+  // Serve uploaded files
+  app.get("/api/messages/files/:id", (req, res) => {
+    const { id } = req.params;
+    const isThumb = req.query.thumb === "1";
+
+    const row = db.prepare("SELECT * FROM message_attachments WHERE id = ?").get(id) as
+      | { storage_path: string; thumbnail_path: string | null; mime_type: string; file_name: string }
+      | undefined;
+
+    if (!row) {
+      return res.status(404).json({ error: "not_found" });
+    }
+
+    const filePath = isThumb && row.thumbnail_path ? row.thumbnail_path : row.storage_path;
+
+    if (!existsSync(filePath)) {
+      return res.status(404).json({ error: "file_not_found" });
+    }
+
+    const stat = statSync(filePath);
+    const mimeType = isThumb ? "image/jpeg" : row.mime_type;
+
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Content-Length", stat.size);
+    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(row.file_name)}"`);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+
+    createReadStream(filePath).pipe(res);
   });
 }

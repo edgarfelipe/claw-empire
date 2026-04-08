@@ -8,6 +8,7 @@ import { notifyTaskStatus } from "../gateway/client.ts";
 import { startDiscordReceiver } from "../messenger/discord-receiver.ts";
 import { startTelegramReceiver } from "../messenger/telegram-receiver.ts";
 import { registerGracefulShutdownHandlers } from "./lifecycle/register-graceful-shutdown.ts";
+import { UsageMonitor } from "./services/usage-monitor.ts";
 
 export function startLifecycle(ctx: RuntimeContext): void {
   const {
@@ -460,6 +461,19 @@ export function startLifecycle(ctx: RuntimeContext): void {
   setTimeout(sweepPendingSubtaskDelegations, 4_000);
   setInterval(sweepPendingSubtaskDelegations, SUBTASK_DELEGATION_SWEEP_MS);
   setTimeout(autoAssignAgentProviders, 4_000);
+
+  // Usage monitor for account rotation & fallback
+  const usageMonitor = new UsageMonitor(db, broadcast);
+  // refreshCliUsageData is attached after routes register (it comes from RouteOpsExports)
+  // We set it lazily via a timeout so the route module has time to wire it up.
+  setTimeout(() => {
+    const ctxAny = ctx as any;
+    if (typeof ctxAny.refreshCliUsageData === "function") {
+      usageMonitor.setRefreshCliUsageData(ctxAny.refreshCliUsageData);
+    }
+    usageMonitor.start();
+  }, 8_000);
+
   const telegramReceiver = startTelegramReceiver({ db });
   const discordReceiver = startDiscordReceiver({ db });
 
@@ -540,6 +554,7 @@ export function startLifecycle(ctx: RuntimeContext): void {
     wss,
     server,
     onBeforeClose: () => {
+      usageMonitor.stop();
       telegramReceiver.stop();
       discordReceiver.stop();
     },

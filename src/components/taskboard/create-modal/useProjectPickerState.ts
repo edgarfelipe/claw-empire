@@ -9,7 +9,7 @@ import {
 import type { Project } from "../../../types";
 import type { FormFeedback, Locale, ManualPathEntry, MissingPathPrompt } from "../constants";
 
-type ResolvePathHelperErrorMessage = (error: unknown, fallback: Record<Locale, string>) => string;
+type ResolvePathHelperErrorMessage = (error: unknown, fallback: { ko: string; en: string } & Partial<Record<Locale, string>>) => string;
 
 interface UseProjectPickerStateParams {
   unsupportedPathApiMessage: string;

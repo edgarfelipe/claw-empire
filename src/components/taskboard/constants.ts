@@ -2,7 +2,7 @@ import type { TaskStatus, TaskType } from "../../types";
 import type { UiLanguage } from "../../i18n";
 
 export type Locale = UiLanguage;
-export type TFunction = (messages: Record<Locale, string>) => string;
+export type TFunction = (messages: { ko: string; en: string } & Partial<Record<Locale, string>>) => string;
 
 const TASK_CREATE_DRAFTS_STORAGE_KEY = "climpire.taskCreateDrafts";
 

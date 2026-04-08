@@ -2,7 +2,7 @@ import type { OAuthAccountInfo } from "../../api";
 import type { UiLanguage } from "../../i18n";
 
 export type Locale = UiLanguage;
-export type TFunction = (messages: Record<Locale, string>) => string;
+export type TFunction = (messages: { ko: string; en: string } & Partial<Record<Locale, string>>) => string;
 
 export function roleLabel(role: string, t: TFunction) {
   switch (role) {

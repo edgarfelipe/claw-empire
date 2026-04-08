@@ -191,6 +191,19 @@ export type SenderType = "ceo" | "agent" | "system";
 export type ReceiverType = "agent" | "department" | "all";
 export type MessageType = "chat" | "task_assign" | "announcement" | "directive" | "report" | "status_update";
 
+export interface MessageAttachment {
+  id: string;
+  file_name: string;
+  file_type: "image" | "audio" | "file";
+  mime_type: string;
+  file_size: number;
+  url: string;
+  thumbnail_url?: string;
+  duration_ms?: number;
+  width?: number;
+  height?: number;
+}
+
 export interface Message {
   id: string;
   sender_type: SenderType;
@@ -203,6 +216,7 @@ export interface Message {
   content: string;
   message_type: MessageType;
   task_id: string | null;
+  attachments?: MessageAttachment[];
   created_at: number;
 }
 

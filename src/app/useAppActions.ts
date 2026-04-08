@@ -68,7 +68,7 @@ export function useAppActions({
       receiverType: "agent" | "department" | "all",
       receiverId?: string,
       messageType?: string,
-      projectMeta?: ProjectMetaPayload,
+      projectMeta?: ProjectMetaPayload & { attachment_ids?: string[] },
     ) => {
       try {
         await api.sendMessage({
@@ -79,6 +79,7 @@ export function useAppActions({
           project_id: projectMeta?.project_id,
           project_path: projectMeta?.project_path,
           project_context: projectMeta?.project_context,
+          attachment_ids: projectMeta?.attachment_ids,
         });
         const msgs = await api.getMessages({ receiver_type: receiverType, receiver_id: receiverId, limit: 50 });
         setMessages(msgs);

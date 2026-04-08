@@ -100,6 +100,7 @@ export async function sendMessage(input: {
   project_id?: string;
   project_path?: string;
   project_context?: string;
+  attachment_ids?: string[];
 }): Promise<string> {
   const idempotencyKey = makeIdempotencyKey("ceo-message");
   const j = await postWithIdempotency<{ id?: string; message?: { id?: string } }>(

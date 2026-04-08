@@ -15,7 +15,7 @@ type CreateTaskHandler = (input: {
   workflow_pack_key?: WorkflowPackKey;
 }) => void | Promise<void>;
 
-type ResolvePathHelperErrorMessage = (error: unknown, fallback: Record<Locale, string>) => string;
+type ResolvePathHelperErrorMessage = (error: unknown, fallback: { ko: string; en: string } & Partial<Record<Locale, string>>) => string;
 
 type SubmitTaskOptions = {
   allowCreateMissingPath?: boolean;

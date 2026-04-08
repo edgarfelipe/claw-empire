@@ -46,7 +46,7 @@ export function usePathHelperMessages(t: TFunction) {
   );
 
   const resolvePathHelperErrorMessage = useCallback(
-    (error: unknown, fallback: Record<Locale, string>) => {
+    (error: unknown, fallback: { ko: string; en: string } & Partial<Record<Locale, string>>) => {
       if (!isApiRequestError(error)) return t(fallback);
 
       if (error.status === 404) {

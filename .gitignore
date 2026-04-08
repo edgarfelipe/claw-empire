@@ -67,3 +67,6 @@ Thumbs.db
 
 # Playwright artifacts
 test-results/
+uploads/
+claw-empire.sqlite
+.env
