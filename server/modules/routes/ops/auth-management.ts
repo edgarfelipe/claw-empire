@@ -584,7 +584,7 @@ export function registerAuthManagementRoutes(ctx: RuntimeContext): void {
       try {
         const rows = db
           .prepare("SELECT * FROM provider_accounts WHERE provider IN ('gemini', 'codex') ORDER BY provider, created_at")
-          .all() as ProviderAccountRow[];
+          .all() as unknown as ProviderAccountRow[];
         dbAccounts = rows.map((r) => ({
           id: r.id,
           provider: r.provider,
@@ -745,7 +745,7 @@ export function registerAuthManagementRoutes(ctx: RuntimeContext): void {
       const limit = Math.min(Number(_req.query.limit) || 50, 200);
       const rows = db
         .prepare("SELECT * FROM usage_events ORDER BY created_at DESC LIMIT ?")
-        .all(limit) as UsageEventRow[];
+        .all(limit) as unknown as UsageEventRow[];
 
       res.json({ ok: true, events: rows });
     } catch (err) {

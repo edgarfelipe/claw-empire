@@ -12,7 +12,7 @@ export interface OfficeRoomManagerProps {
   onThemeChange: (themes: Record<string, DeptTheme>) => void;
   onActiveDeptChange?: (deptId: string | null) => void;
   onClose: () => void;
-  language: "ko" | "en" | "ja" | "zh";
+  language: "ko" | "en" | "ja" | "zh" | "pt";
 }
 
 /* ================================================================== */
@@ -121,7 +121,7 @@ interface DeptCardProps {
   deptId: string;
   deptName: string;
   state: DeptState;
-  language: "ko" | "en" | "ja" | "zh";
+  language: "ko" | "en" | "ja" | "zh" | "pt";
   onActivate: () => void;
   onAccentChange: (accent: number) => void;
   onToneChange: (tone: number) => void;
