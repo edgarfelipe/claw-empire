@@ -33,13 +33,13 @@ const DEFAULT_THEMES: Record<string, DeptTheme> = {
 const DEFAULT_TONE = 50;
 
 const labels = {
-  title: { ko: "사무실 관리", en: "Office Manager", ja: "オフィス管理", zh: "办公室管理" },
-  accent: { ko: "메인 색상", en: "Main Color", ja: "メインカラー", zh: "主色调" },
-  tone: { ko: "톤 (밝기)", en: "Tone (Brightness)", ja: "トーン（明るさ）", zh: "色调（亮度）" },
-  reset: { ko: "초기화", en: "Reset", ja: "リセット", zh: "重置" },
-  resetAll: { ko: "전체 초기화", en: "Reset All", ja: "全てリセット", zh: "全部重置" },
-  close: { ko: "닫기", en: "Close", ja: "閉じる", zh: "关闭" },
-  presets: { ko: "프리셋", en: "Presets", ja: "プリセット", zh: "预设" },
+  title: { ko: "사무실 관리", en: "Office Manager", ja: "オフィス管理", zh: "办公室管理", pt: "Gerenciador do Escritório" },
+  accent: { ko: "메인 색상", en: "Main Color", ja: "メインカラー", zh: "主色调", pt: "Cor Principal" },
+  tone: { ko: "톤 (밝기)", en: "Tone (Brightness)", ja: "トーン（明るさ）", zh: "色调（亮度）", pt: "Tom (Brilho)" },
+  reset: { ko: "초기화", en: "Reset", ja: "リセット", zh: "重置", pt: "Resetar" },
+  resetAll: { ko: "전체 초기화", en: "Reset All", ja: "全てリセット", zh: "全部重置", pt: "Resetar Tudo" },
+  close: { ko: "닫기", en: "Close", ja: "閉じる", zh: "关闭", pt: "Fechar" },
+  presets: { ko: "프리셋", en: "Presets", ja: "プリセット", zh: "预设", pt: "Predefinições" },
 };
 
 /* ================================================================== */

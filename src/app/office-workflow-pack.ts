@@ -1,8 +1,8 @@
 import type { Agent, AgentRole, CliProvider, Department, RoomTheme, WorkflowPackKey } from "../types";
 
-export type UiLanguageLike = "ko" | "en" | "ja" | "zh";
+export type UiLanguageLike = "ko" | "en" | "ja" | "zh" | "pt";
 
-type Localized = { ko: string; en: string; ja: string; zh: string };
+type Localized = { ko: string; en: string; ja: string; zh: string; pt?: string };
 type DeptPreset = {
   name: Localized;
   icon: string;
@@ -467,6 +467,8 @@ function pickText(locale: UiLanguageLike, text: Localized): string {
       return text.ja || text.en;
     case "zh":
       return text.zh || text.en;
+    case "pt":
+      return text.pt || text.en;
     case "en":
     default:
       return text.en;
@@ -571,12 +573,19 @@ function buildSeedPersonality(params: {
       junior: "初级成员",
       intern: "实习成员",
     },
+    pt: {
+      team_leader: "líder de equipe",
+      senior: "membro sênior",
+      junior: "membro júnior",
+      intern: "estagiário",
+    },
   };
   const focusByLocale: Record<UiLanguageLike, string> = {
     ko: params.defaultPrefix.ko?.trim() || `${params.departmentName.ko} 담당`,
     en: params.defaultPrefix.en?.trim() || `${params.departmentName.en} coverage`,
     ja: params.defaultPrefix.ja?.trim() || `${params.departmentName.ja}担当`,
     zh: params.defaultPrefix.zh?.trim() || `${params.departmentName.zh}职责`,
+    pt: params.defaultPrefix.pt?.trim() || params.defaultPrefix.en?.trim() || `${params.departmentName.en} cobertura`,
   };
   const roleLabel = roleLabelMap[locale][params.role];
   const focus = focusByLocale[locale];
@@ -584,6 +593,7 @@ function buildSeedPersonality(params: {
   if (locale === "ko") return `${toneText} ${focus} 역할의 ${roleLabel}입니다.`;
   if (locale === "ja") return `${toneText} ${focus}を担当する${roleLabel}として動きます。`;
   if (locale === "zh") return `${toneText} 作为负责${focus}的${roleLabel}推进工作。`;
+  if (locale === "pt") return `${toneText} Atua como ${roleLabel} focado em ${focus}.`;
   return `${toneText} Serves as a ${roleLabel} focused on ${focus}.`;
 }
 
@@ -597,6 +607,7 @@ function buildPackDepartmentDescription(params: {
   const deptName = pickText(locale, departmentName);
   if (locale === "ko") return `${deptName}입니다. ${summary} 목표를 중심으로 협업합니다.`;
   if (locale === "ja") return `${deptName}です。${summary}の目標達成に向けて連携します。`;
+  if (locale === "pt") return `Equipe ${deptName}. Colabora para atingir o objetivo de ${summary.toLowerCase()}.`;
   if (locale === "zh") return `${deptName}团队。围绕${summary}目标协作推进。`;
   return `${deptName} team. Collaborates to deliver the ${summary.toLowerCase()} goal.`;
 }
@@ -617,6 +628,9 @@ function buildPackDepartmentPrompt(params: {
   }
   if (locale === "zh") {
     return `[部门职责] ${deptName}\n[执行基准] ${summary}\n请将请求拆分为可执行步骤，并清晰提供依据与产出物。`;
+  }
+  if (locale === "pt") {
+    return `[Papel do Departamento] ${deptName}\n[Padrão de Execução] ${summary}\nDivida as solicitações em etapas acionáveis e forneça justificativas e entregáveis com clareza.`;
   }
   return `[Department Role] ${deptName}\n[Execution Standard] ${summary}\nBreak requests into actionable steps and clearly provide rationale and deliverables.`;
 }
