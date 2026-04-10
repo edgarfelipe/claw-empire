@@ -1,6 +1,7 @@
-import { isLang, type Lang } from "../../../types/lang.ts";
+import { isLang, langForL10n, type Lang } from "../../../types/lang.ts";
 
-export type L10n = Record<Lang, string[]>;
+// L10n only has ko/en/ja/zh — pt falls back to en via langForL10n()
+export type L10n = Record<"ko" | "en" | "ja" | "zh", string[]>;
 
 export type DirectivePolicy = {
   skipDelegation: boolean;
@@ -140,7 +141,8 @@ export function initializeCollabLanguagePolicy(deps: LanguagePolicyDeps) {
   }
 
   function pickL(pool: L10n, lang: Lang): string {
-    const arr = pool[lang];
+    const key = langForL10n(lang);
+    const arr = pool[key];
     return arr[Math.floor(Math.random() * arr.length)];
   }
 

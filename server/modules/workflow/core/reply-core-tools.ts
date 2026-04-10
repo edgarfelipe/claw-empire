@@ -76,8 +76,11 @@ export function createReplyCoreTools(deps: CreateReplyCoreToolsDeps) {
       case "en":
         return "Respond in English.";
       case "ko":
-      default:
         return "Respond in Korean.";
+      case "pt":
+        return "Responda sempre em português brasileiro (pt-BR). Nunca use coreano, japonês ou chinês.";
+      default:
+        return "Responda sempre em português brasileiro (pt-BR). Nunca use coreano, japonês ou chinês.";
     }
   }
 

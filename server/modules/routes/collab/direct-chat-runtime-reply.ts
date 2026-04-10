@@ -69,7 +69,8 @@ function localeInstructionForDirect(lang: Lang): string {
   if (lang === "en") return "Respond in English.";
   if (lang === "ja") return "Respond in Japanese.";
   if (lang === "zh") return "Respond in Chinese.";
-  return "Respond in Korean.";
+  if (lang === "pt") return "Responda sempre em português brasileiro (pt-BR). Nunca use coreano, japonês ou chinês.";
+  return "Responda sempre em português brasileiro (pt-BR). Nunca use coreano, japonês ou chinês.";
 }
 
 export function createDirectReplyRuntime(deps: DirectReplyRuntimeDeps) {
