@@ -1,11 +1,19 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState, useEffect } from "react";
 import type { CliUsageEntry, CliUsageWindow } from "../../api";
+import { getAuthManagementStatus, switchAuthAccount } from "../../api/auth-management";
 import type { UiLanguage } from "../../i18n";
 import type { CliStatusMap } from "../../types";
 import { formatReset } from "./drawing-furniture-b";
 import { LOCALE_TEXT } from "./themes-locale";
 
 type TFunction = (messages: Record<UiLanguage, string>) => string;
+
+interface ClaudeAccountInfo {
+  id: string;
+  email: string;
+  plan?: string;
+  isActive: boolean;
+}
 
 interface CliUsagePanelProps {
   cliStatus: CliStatusMap | null;
@@ -95,6 +103,40 @@ export default function CliUsagePanel({
   onRefreshUsage,
   t,
 }: CliUsagePanelProps) {
+  const [claudeAccounts, setClaudeAccounts] = useState<ClaudeAccountInfo[]>([]);
+  const [switching, setSwitching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  useEffect(() => {
+    getAuthManagementStatus().then((status) => {
+      if (status?.claude?.authenticated && status.claude.accounts) {
+        setClaudeAccounts(
+          status.claude.accounts.map((a: any) => ({
+            id: a.id,
+            email: a.email,
+            plan: a.subscriptionType,
+            isActive: a.id === status.claude.activeAccountId,
+          }))
+        );
+      }
+    }).catch(() => {});
+  }, [switching]);
+
+  const handleSwitchAccount = async (accountId: string) => {
+    setSwitching(true);
+    setShowDropdown(false);
+    try {
+      await switchAuthAccount("claude", accountId);
+      // Refresh usage after switch
+      setTimeout(() => {
+        onRefreshUsage();
+        setSwitching(false);
+      }, 2000);
+    } catch {
+      setSwitching(false);
+    }
+  };
+
   const connectedClis = CLI_DISPLAY.filter((cli) => {
     const status = cliStatus?.[cli.key as keyof CliStatusMap];
     return status?.installed && status?.authenticated;
@@ -165,6 +207,42 @@ export default function CliUsagePanel({
                     <span className="flex h-[18px] w-[18px] items-center justify-center text-base">{cli.icon}</span>
                     <span className={`text-sm font-semibold ${cli.color}`}>{cli.name}</span>
                   </div>
+                  {cli.key === "claude" && claudeAccounts.length > 1 && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowDropdown(!showDropdown)}
+                        disabled={switching}
+                        className="rounded-md bg-slate-700/80 px-2 py-0.5 text-[10px] text-slate-300 hover:bg-slate-600 hover:text-white transition-colors disabled:opacity-50"
+                      >
+                        {switching ? "⏳" : "🔄"} {switching
+                          ? t({ ko: "전환중...", en: "Switching...", ja: "切替中...", zh: "切换中..." })
+                          : t({ ko: "계정 전환", en: "Switch", ja: "切替", zh: "切换" })}
+                      </button>
+                      {showDropdown && (
+                        <div className="absolute right-0 top-7 z-50 min-w-[200px] rounded-lg border border-slate-600 bg-slate-800 p-1 shadow-xl">
+                          {claudeAccounts.map((acc) => (
+                            <button
+                              key={acc.id}
+                              onClick={() => !acc.isActive && handleSwitchAccount(acc.id)}
+                              className={`flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-[11px] transition-colors ${
+                                acc.isActive
+                                  ? "bg-emerald-500/20 text-emerald-300 cursor-default"
+                                  : "text-slate-300 hover:bg-slate-700 hover:text-white cursor-pointer"
+                              }`}
+                            >
+                              <span className={`h-1.5 w-1.5 rounded-full ${acc.isActive ? "bg-emerald-400" : "bg-slate-500"}`} />
+                              <span className="truncate">{acc.email}</span>
+                              {acc.plan && (
+                                <span className="ml-auto rounded bg-slate-700 px-1 text-[9px] text-slate-400 uppercase">
+                                  {acc.plan}
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {usage?.error === "unauthenticated" && (

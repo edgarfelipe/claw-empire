@@ -79,10 +79,12 @@ function getClaudeAuthStatus(): ProviderAuthStatus {
       authenticated: !!activeAccount,
       account: activeAccount?.email ?? activeId,
       plan: activeAccount?.subscriptionType?.toUpperCase() ?? "unknown",
+      activeAccountId: activeId,
       accounts: (data.accounts ?? []).map((a) => ({
         id: a.id,
         email: a.email,
         label: a.label,
+        subscriptionType: a.subscriptionType,
         plan: a.subscriptionType?.toUpperCase(),
         active: a.id === activeId,
       })),
