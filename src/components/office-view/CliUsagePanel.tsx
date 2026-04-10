@@ -1,6 +1,6 @@
 import { type ReactNode, useState, useEffect } from "react";
 import type { CliUsageEntry, CliUsageWindow } from "../../api";
-import { getAuthManagementStatus, switchAuthAccount } from "../../api/auth-management";
+import { getAuthManagementStatus, switchAuthAccount, triggerLogin } from "../../api/auth-management";
 import type { UiLanguage } from "../../i18n";
 import type { CliStatusMap } from "../../types";
 import { formatReset } from "./drawing-furniture-b";
@@ -106,16 +106,18 @@ export default function CliUsagePanel({
   const [claudeAccounts, setClaudeAccounts] = useState<ClaudeAccountInfo[]>([]);
   const [switching, setSwitching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [loginUrl, setLoginUrl] = useState<string | null>(null);
+  const [loginLoading, setLoginLoading] = useState(false);
 
   useEffect(() => {
     getAuthManagementStatus().then((status) => {
-      if (status?.claude?.authenticated && status.claude.accounts) {
+      if (status?.claude?.accounts) {
         setClaudeAccounts(
           status.claude.accounts.map((a: any) => ({
             id: a.id,
             email: a.email,
-            plan: a.subscriptionType,
-            isActive: a.id === status.claude.activeAccountId,
+            plan: a.subscriptionType || a.plan,
+            isActive: a.active ?? a.id === status.claude.activeAccountId,
           }))
         );
       }
@@ -127,7 +129,6 @@ export default function CliUsagePanel({
     setShowDropdown(false);
     try {
       await switchAuthAccount("claude", accountId);
-      // Refresh usage after switch
       setTimeout(() => {
         onRefreshUsage();
         setSwitching(false);
@@ -135,6 +136,34 @@ export default function CliUsagePanel({
     } catch {
       setSwitching(false);
     }
+  };
+
+  const handleLogin = async (email?: string) => {
+    setLoginLoading(true);
+    setShowDropdown(false);
+    try {
+      const result = await triggerLogin("claude", email);
+      if (result.alreadyAuthenticated) {
+        onRefreshUsage();
+        setLoginLoading(false);
+        return;
+      }
+      if (result.loginUrl) {
+        setLoginUrl(result.loginUrl);
+      }
+    } catch {
+      // ignore
+    }
+    setLoginLoading(false);
+  };
+
+  const handleLoginDone = () => {
+    setLoginUrl(null);
+    setSwitching(true);
+    setTimeout(() => {
+      onRefreshUsage();
+      setSwitching(false);
+    }, 3000);
   };
 
   const connectedClis = CLI_DISPLAY.filter((cli) => {
@@ -145,6 +174,7 @@ export default function CliUsagePanel({
   if (connectedClis.length === 0) return null;
 
   return (
+    <>
     <div className="mt-4 px-2">
       <div className="rounded-2xl border border-slate-700/60 bg-slate-900/80 p-4 backdrop-blur-sm">
         <div className="mb-3 flex items-center justify-between">
@@ -219,7 +249,7 @@ export default function CliUsagePanel({
                           : t({ ko: "계정 전환", en: "Switch", ja: "切替", zh: "切换" })}
                       </button>
                       {showDropdown && (
-                        <div className="absolute right-0 top-7 z-50 min-w-[200px] rounded-lg border border-slate-600 bg-slate-800 p-1 shadow-xl">
+                        <div className="absolute right-0 top-7 z-50 min-w-[220px] rounded-lg border border-slate-600 bg-slate-800 p-1 shadow-xl">
                           {claudeAccounts.map((acc) => (
                             <button
                               key={acc.id}
@@ -239,6 +269,15 @@ export default function CliUsagePanel({
                               )}
                             </button>
                           ))}
+                          <div className="my-1 border-t border-slate-700" />
+                          <button
+                            onClick={() => handleLogin()}
+                            disabled={loginLoading}
+                            className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-[11px] text-amber-300 hover:bg-amber-500/20 transition-colors"
+                          >
+                            <span>🔑</span>
+                            <span>{loginLoading ? "Aguarde..." : "Re-autenticar conta"}</span>
+                          </button>
                         </div>
                       )}
                     </div>
@@ -311,5 +350,53 @@ export default function CliUsagePanel({
         </div>
       </div>
     </div>
+
+    </div>
+    {/* Login URL Modal */}
+    {loginUrl && (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="mx-4 max-w-lg rounded-2xl border border-slate-600 bg-slate-800 p-6 shadow-2xl">
+          <h3 className="mb-3 text-lg font-semibold text-white flex items-center gap-2">
+            🔑 {t({ ko: "Claude 로그인", en: "Claude Login", ja: "Claudeログイン", zh: "Claude登录" })}
+          </h3>
+          <p className="mb-4 text-sm text-slate-300">
+            {t({ ko: "아래 링크를 브라우저에서 열어 로그인하세요.", en: "Open the link below in your browser to authenticate.", ja: "以下のリンクをブラウザで開いてログインしてください。", zh: "在浏览器中打开以下链接登录。" })}
+          </p>
+          <div className="mb-4 rounded-lg bg-slate-900 p-3">
+            <a
+              href={loginUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-400 hover:text-blue-300 underline break-all"
+            >
+              {loginUrl.length > 80 ? loginUrl.slice(0, 80) + "..." : loginUrl}
+            </a>
+          </div>
+          <div className="flex gap-3">
+            <a
+              href={loginUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+            >
+              {t({ ko: "로그인 페이지 열기", en: "Open Login Page", ja: "ログインページを開く", zh: "打开登录页" })}
+            </a>
+            <button
+              onClick={handleLoginDone}
+              className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-emerald-500 transition-colors"
+            >
+              {t({ ko: "완료", en: "Done - I logged in", ja: "完了", zh: "完成" })}
+            </button>
+          </div>
+          <button
+            onClick={() => setLoginUrl(null)}
+            className="mt-3 w-full text-center text-xs text-slate-500 hover:text-slate-300"
+          >
+            {t({ ko: "취소", en: "Cancel", ja: "キャンセル", zh: "取消" })}
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

@@ -73,6 +73,13 @@ export function switchAuthAccount(
   return post("/api/auth/management/switch-account", { provider, accountId });
 }
 
+export function triggerLogin(
+  provider: string,
+  email?: string,
+): Promise<{ ok: boolean; loginUrl?: string; alreadyAuthenticated?: boolean }> {
+  return post("/api/auth/management/login", { provider, email });
+}
+
 export function updateProviderKey(
   provider: string,
   apiKey: string,

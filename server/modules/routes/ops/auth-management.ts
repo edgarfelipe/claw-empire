@@ -256,6 +256,31 @@ export function registerAuthManagementRoutes(ctx: RuntimeContext): void {
     }
   });
 
+  // POST /api/auth/management/login — Trigger OAuth login and return URL
+  app.post("/api/auth/management/login", async (req, res) => {
+    try {
+      const { provider, email } = req.body as { provider: string; email?: string };
+      if (provider !== "claude") {
+        return res.status(400).json({ error: "unsupported_provider" });
+      }
+      const emailFlag = email ? ` --email "${email}"` : "";
+      const output = execSync(
+        `timeout 5 bash -c 'claude auth login --claudeai${emailFlag} 2>&1' || true`,
+        { encoding: "utf-8", timeout: 8000 }
+      );
+      const urlMatch = output.match(/(https:\/\/claude\.com\/cai\/oauth\/authorize[^\s]+)/);
+      if (!urlMatch) {
+        if (output.includes("already") || output.includes("logged in")) {
+          return res.json({ ok: true, alreadyAuthenticated: true });
+        }
+        return res.status(500).json({ error: "no_url", output });
+      }
+      res.json({ ok: true, loginUrl: urlMatch[1] });
+    } catch (err) {
+      res.status(500).json({ error: "login_failed", message: String(err) });
+    }
+  });
+
   // -------------------------------------------------------------------------
   // POST /api/auth/management/update-key — Update API key for a provider
   // -------------------------------------------------------------------------
