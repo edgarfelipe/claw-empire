@@ -368,11 +368,10 @@ export function ChatPanel({
     textareaRef.current?.focus();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-      e.preventDefault();
-      handleSend();
-    }
+  // handleKeyDown is now a no-op — Enter handling is done inside ChatComposer
+  // via handleSendWithAttachments to ensure attachments are always included
+  const handleKeyDown = (_e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Intentionally empty — ChatComposer handles Enter key
   };
 
   useEffect(() => {

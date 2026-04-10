@@ -390,7 +390,13 @@ export default function ChatComposer({
             ref={textareaRef}
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
-            onKeyDown={onKeyDown}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                handleSendWithAttachments();
+              }
+              onKeyDown(e);
+            }}
             onPaste={handlePaste}
             placeholder={
               isAnnouncementMode
